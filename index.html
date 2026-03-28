@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SafeRoute</title>
+<link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="css/style.css"/>
+</head>
+<body>
+
+<nav>
+  <div class="logo"><div class="logo-icon">SR</div>SafeRoute <span class="logo-tag">Mumbai</span></div>
+  <div class="nav-right">
+    <div class="time-chip" id="navClock">—</div>
+    <button class="night-btn" id="nightBtn">🌙</button>
+    <button id="navSos"><div class="sos-dot"></div>SOS</button>
+  </div>
+</nav>
+
+<div class="app">
+  <div class="sidebar">
+    <div class="time-banner safe" id="timeBanner">
+      <div style="width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0;"></div>
+      <span id="tbText">Loading…</span>
+    </div>
+
+    <div class="sb" id="sbScroll">
+
+      <!-- SEARCH -->
+      <div class="search-wrap">
+        <div class="sec-head">Plan your route</div>
+        <div class="mode-row">
+          <button class="mode-btn active" id="modeDrive">🚗 Driving</button>
+          <button class="mode-btn" id="modeWalk">🚶 Walking</button>
+        </div>
+        <div class="field" id="fFrom">
+          <div class="fmark" style="background:#2a6b4a"></div>
+          <input id="inFrom" type="text" placeholder="Starting point" autocomplete="off" spellcheck="false"/>
+          <button class="fclear" id="clearFrom" title="Clear">✕</button>
+          <button class="floc-btn" id="locBtn" title="Use my location">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8" stroke-opacity=".3"/></svg>
+          </button>
+        </div>
+        <div class="drop" id="dropFrom"></div>
+        <div class="swap-row">
+          <div class="swap-line"></div>
+          <button id="swapBtn">⇅ Swap</button>
+        </div>
+        <div class="field" id="fTo">
+          <div class="fmark" style="background:#c8401a"></div>
+          <input id="inTo" type="text" placeholder="Destination" autocomplete="off" spellcheck="false"/>
+          <button class="fclear" id="clearTo">✕</button>
+        </div>
+        <div class="drop" id="dropTo"></div>
+        <button id="goBtn"><div class="gspin"></div><span class="glbl">Find Safe Routes</span></button>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- MUMBAI POLICE OFFICIAL DATA CARD -->
+      <div class="ncrb-alert">
+        <div class="ncrb-alert-title">📊 Official Mumbai Police Crime Data</div>
+        <div class="ncrb-stat-row">
+          <div class="ncrb-stat"><div class="ncrb-stat-n">7,143</div><div class="ncrb-stat-l">2025 total</div></div>
+          <div class="ncrb-stat"><div class="ncrb-stat-n">515</div><div class="ncrb-stat-l">Jan 2026</div></div>
+          <div class="ncrb-stat"><div class="ncrb-stat-n">1,257</div><div class="ncrb-stat-l">Rape 2025</div></div>
+        </div>
+        <div style="font-size:.65rem;color:var(--ink2);font-weight:600;margin-top:6px;">Jan 2026: Rape 80 · Kidnapping 111 · Molestation 174</div>
+        <div style="font-size:.6rem;color:var(--muted);margin-top:3px;">Source: Brihan Mumbai Police Comparative Crime Statement, Jan 2026 &amp; Annual 2025</div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- QUICK ACTIONS -->
+      <div class="qa-grid">
+        <button class="qa" id="btnLoc"><div class="qa-ico">📍</div><div><div class="qa-lbl">My Location</div><div class="qa-sub">Use GPS</div></div></button>
+        <button class="qa" id="btnSos"><div class="qa-ico">🚨</div><div><div class="qa-lbl">SOS Alert</div><div class="qa-sub">Emergency</div></div></button>
+        <button class="qa" id="btnTimer"><div class="qa-ico">⏱️</div><div><div class="qa-lbl">Safe Walk</div><div class="qa-sub">Timer</div></div></button>
+        <button class="qa" id="btnFakeCall"><div class="qa-ico">📱</div><div><div class="qa-lbl">Fake Call</div><div class="qa-sub">Escape cover</div></div></button>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- TIMER -->
+      <div id="timerBlock" style="display:none;">
+        <div class="sec-head" style="padding:10px 16px 0;">Safe Walk Timer</div>
+        <div class="timer-card">
+          <div class="tc-top"><span style="font-size:.75rem;font-weight:700;">Status</span><span class="tc-badge" id="tcBadge">Inactive</span></div>
+          <div class="tc-time" id="tcTime">00:00</div>
+          <div class="tc-sub" id="tcSub">Start when you begin your journey.</div>
+          <div class="tc-btns">
+            <button class="tcb tcb-s" id="tcStart">▶ Start</button>
+            <button class="tcb tcb-ok" id="tcStop" style="display:none;">✓ Safe</button>
+            <button class="tcb tcb-sh" id="tcShare">📡 Share</button>
+          </div>
+        </div>
+        <div class="divider"></div>
+      </div>
+
+      <!-- IR BANNER -->
+      <div class="ir-banner" id="irBannerBtn">
+        <div>⚠</div>
+        <div style="flex:1;"><div class="ir-title">Report an Incident</div><div class="ir-sub">Flag an unsafe spot on the map</div></div>
+        <div>→</div>
+      </div>
+      <div class="divider"></div>
+
+      <!-- CONTACTS -->
+      <div class="sec-head" style="padding:10px 16px 0;">Trusted contacts</div>
+      <div class="contacts-card">
+        <div id="cList"></div>
+        <button id="addContactBtn">+ Add trusted contact</button>
+      </div>
+      <div class="divider"></div>
+
+      <!-- ROUTES -->
+      <div id="blockRoutes" style="display:none;">
+        <div class="rcards">
+          <div class="sec-head" style="padding:0;margin-bottom:9px;">Route options</div>
+          <button class="rcard sel" id="rc0"><div class="rc-ico" style="background:var(--sage-l)">🛡️</div><div class="rc-info"><div class="rc-name">Safest Route</div><div class="rc-meta" id="rm0">—</div></div><div class="rc-sc" id="rs0" style="color:var(--sage)">—</div></button>
+          <button class="rcard" id="rc1"><div class="rc-ico" style="background:var(--gold-l)">⚡</div><div class="rc-info"><div class="rc-name">Fastest Route</div><div class="rc-meta" id="rm1">—</div></div><div class="rc-sc" id="rs1" style="color:var(--gold)">—</div></button>
+          <button class="rcard" id="rc2"><div class="rc-ico" style="background:var(--slate-l)">⚖️</div><div class="rc-info"><div class="rc-name">Balanced Route</div><div class="rc-meta" id="rm2">—</div></div><div class="rc-sc" id="rs2" style="color:var(--slate)">—</div></button>
+        </div>
+        <div class="divider"></div>
+      </div>
+
+      <!-- SCORE -->
+      <div id="blockScore" style="display:none;">
+        <div class="spanel">
+          <div class="sec-head" style="padding:0;margin-bottom:8px;">Safety analysis</div>
+          <div class="score-row">
+            <div class="s-num" id="sNum">—</div>
+            <div class="s-right"><div class="s-tag" id="sTag">—</div><div class="s-desc" id="sDesc">—</div></div>
+          </div>
+          <div class="bar-bg"><div class="bar-fg" id="barFg" style="width:0%"></div></div>
+          <div class="mets">
+            <div class="met"><div class="met-v" id="mDist">—</div><div class="met-l">Distance</div></div>
+            <div class="met"><div class="met-v" id="mTime">—</div><div class="met-l">Duration</div></div>
+            <div class="met"><div class="met-v" id="mHots">—</div><div class="met-l">Hotspots</div></div>
+          </div>
+        </div>
+        <div class="divider"></div>
+      </div>
+
+      <!-- TURN BY TURN -->
+      <div id="blockTurns" style="display:none;">
+        <div class="turns-wrap">
+          <div class="sec-head" style="padding:0;margin-bottom:8px;">🧭 Turn-by-Turn Directions</div>
+          <div id="turnsList"></div>
+        </div>
+        <div class="divider"></div>
+      </div>
+
+      <!-- NAV STATUS BAR -->
+      <div id="navStatus">
+        <div class="nav-instr" id="navInstruction">Follow the route</div>
+        <div class="nav-meta">
+          <div class="nav-dist" id="navDistLeft">—</div>
+          <div class="nav-time" id="navTimeLeft">—</div>
+        </div>
+      </div>
+
+      <!-- START / STOP NAVIGATION -->
+      <div class="nav-start-wrap" id="navBtns" style="display:none;">
+        <button id="startNavBtn">🧭 Start Navigation</button>
+        <button id="stopNavBtn">■ Stop</button>
+      </div>
+
+      <!-- HOTSPOTS -->
+      <div id="blockHs" style="display:none;">
+        <div class="lsec">
+          <div class="sec-head" style="padding:0;margin-bottom:8px;">⚠ Crime hotspots near route</div>
+          <div id="hsList"></div>
+        </div>
+        <div class="divider"></div>
+      </div>
+
+      <!-- SAFE SPOTS -->
+      <div id="blockSs" style="display:none;">
+        <div class="lsec">
+          <div class="sec-head" style="padding:0;margin-bottom:8px;">✦ Safe spots on route <span id="ssCount" style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);font-size:.7rem;"></span></div>
+          <div id="ssList"></div>
+        </div>
+        <div class="divider"></div>
+      </div>
+
+      <!-- TIMELINE -->
+      <div id="blockTimeline" style="display:none;">
+        <div class="lsec">
+          <div class="sec-head" style="padding:0;margin-bottom:8px;">📈 Safety score by hour (IST)</div>
+          <div style="background:var(--paper);border:1.5px solid var(--border);border-radius:6px;padding:10px 10px 6px;">
+            <canvas id="timelineChart" height="90"></canvas>
+          </div>
+          <div style="font-size:.62rem;color:var(--muted);margin-top:5px;padding-bottom:4px;">Score drops after 6 PM and 9 PM due to night risk.</div>
+        </div>
+        <div class="divider"></div>
+      </div>
+
+      <!-- AI -->
+      <div style="padding-bottom:16px;">
+        <div class="lsec">
+          <div class="sec-head" style="padding:0;margin-bottom:8px;">🤖 AI Safety Assistant</div>
+          <div class="ai-wrap">
+            <div class="ai-msgs" id="aiMsgs">
+              <div class="ai-bubble ai-bot">Hi! Ask me anything — "Is Dharavi safe at night?", "What to do if followed?", or about your current route.</div>
+            </div>
+            <div class="ai-input-row">
+              <input id="aiInput" type="text" placeholder="Ask a safety question…" autocomplete="off"/>
+              <button id="aiSend">→</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- EMPTY STATE -->
+      <div class="empty" id="emptyState">
+        <div class="empty-ico">🗺️</div>
+        <div class="empty-t">Plan a safe route</div>
+        <div class="empty-s">Search your start &amp; destination. Get safety scores, crime hotspots, and safe spots along your path.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MAP -->
+  <div class="map-wrap">
+    <div id="map"></div>
+    <div class="legend">
+      <div class="leg-t">Legend</div>
+      <div class="leg-r"><div class="leg-d" style="background:#c8401a"></div><div class="leg-l">High risk</div></div>
+      <div class="leg-r"><div class="leg-d" style="background:#b8860b"></div><div class="leg-l">Moderate</div></div>
+      <div class="leg-r"><div class="leg-d" style="background:#2a6b4a"></div><div class="leg-l">Low risk</div></div>
+      <div class="leg-r"><div class="leg-d" style="background:#2c4a6e"></div><div class="leg-l">Police / Safe spot</div></div>
+      <div class="leg-r"><div class="leg-d" style="background:#e05252"></div><div class="leg-l">User report</div></div>
+      <div style="font-size:.54rem;color:var(--muted);margin-top:6px;border-top:1px solid var(--border);padding-top:5px;">Data: Mumbai Police 2025-26</div>
+    </div>
+    <div class="map-btns">
+      <button class="map-btn" id="mapReportBtn">⚑ Report Incident</button>
+      <button class="map-btn" id="heatmapBtn">🌡 NCRB Heatmap</button>
+    </div>
+    <div class="map-pill" id="pill"><div class="dspin"></div><span id="pillTxt">Loading…</span></div>
+  </div>
+</div>
+
+<!-- SOS MODAL -->
+<div class="overlay" id="sosModal">
+  <div class="modal">
+    <div class="m-ring" style="background:var(--rust-l);border:1px solid rgba(200,64,26,.2);">🚨</div>
+    <h2>Emergency SOS</h2>
+    <p>Alert your contacts and call emergency services immediately.</p>
+    <div class="m-contacts" id="sosContacts"></div>
+    <div class="m-acts">
+      <a class="ma ma-r1" href="tel:112">📞 Call 112 — Emergency Services</a>
+      <a class="ma ma-r2" href="tel:1091">📞 Call 1091 — Women's Helpline</a>
+      <a class="ma ma-g" id="waLink" href="#" target="_blank">💬 WhatsApp SOS Alert</a>
+      <button class="ma ma-a" id="modalShare">📡 Share Live Location</button>
+      <button class="ma ma-gh" id="closeSos">Dismiss</button>
+    </div>
+  </div>
+</div>
+
+<!-- FAKE CALL -->
+<div class="fakecall-overlay" id="fakeCallModal">
+  <div class="fc-name" id="fcName">Mom</div>
+  <div class="fc-sub">Incoming call…</div>
+  <div class="fc-btns">
+    <div style="text-align:center;"><button class="fc-btn fc-decline" id="fcDecline">📵</button><div style="font-size:.68rem;color:rgba(255,255,255,.45);margin-top:6px;">End</div></div>
+    <div style="text-align:center;"><button class="fc-btn fc-accept" id="fcAccept">📞</button><div style="font-size:.68rem;color:rgba(255,255,255,.45);margin-top:6px;">Accept</div></div>
+  </div>
+  <div class="fc-ring">Ringing…</div>
+</div>
+
+<!-- INCIDENT MODAL -->
+<div class="overlay" id="irModal">
+  <div class="modal" style="text-align:left;width:340px;">
+    <h2 style="margin-bottom:4px;">Report an Incident</h2>
+    <p style="margin-bottom:2px;">Help others by flagging an unsafe area.</p>
+    <div class="ir-form">
+      <label>Incident type</label>
+      <select id="irType"><option>Harassment / Eve Teasing</option><option>Poor Lighting</option><option>Suspicious Activity</option><option>Unsafe Road / No Footpath</option><option>Stalking</option><option>Other</option></select>
+      <label>Time of incident</label>
+      <select id="irTime"><option>Just now</option><option>Last hour</option><option>Today</option><option>This week</option></select>
+      <label>Description (optional)</label>
+      <textarea id="irDesc" placeholder="Any details that may help others…"></textarea>
+    </div>
+    <div class="ir-btns">
+      <button class="ir-submit" id="irSubmit">Submit Report</button>
+      <button class="ir-cancel" id="irCancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
