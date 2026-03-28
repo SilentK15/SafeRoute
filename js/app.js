@@ -177,11 +177,15 @@ let _irMarkers=lsGet('sr_incidents',[]);
 function openIRModal(){document.getElementById('irModal').classList.add('on');}
 function closeIRModal(){document.getElementById('irModal').classList.remove('on');}
 function submitIncident(){
-  const type=document.getElementById('irType').value,time=document.getElementById('irTime').value,desc=document.getElementById('irDesc').value;
+  const type=document.getElementById('irType').value;
+  const time=document.getElementById('irTime').value;
+  const desc=document.getElementById('irDesc').value;
+  window._lastIrDesc=desc; // stash for backend.js BEFORE clearing
   const inc={lat:_uLat,lng:_uLng,type,time,desc};
   _irMarkers.push(inc);lsSet('sr_incidents',_irMarkers);
   addIncidentMarker(inc);
-  closeIRModal();document.getElementById('irDesc').value='';toast('Incident reported — thank you!');
+  document.getElementById('irDesc').value=''; // clear AFTER stashing
+  closeIRModal();toast('Incident reported — thank you!');
 }
 
 /* ── DISTANCE FUNCTIONS ── */
@@ -951,6 +955,34 @@ function highlightTurnStep(idx){
   });
 }
 
+/* ── AI ASSISTANT ── */
+async function sendAI(){
+  const inp=document.getElementById('aiInput');const msgs=document.getElementById('aiMsgs');
+  const text=inp.value.trim();if(!text)return;inp.value='';
+  const ub=document.createElement('div');ub.className='ai-bubble ai-user';ub.textContent=text;msgs.appendChild(ub);
+  const lb=document.createElement('div');lb.className='ai-bubble ai-bot ai-loading';lb.textContent='Thinking…';msgs.appendChild(lb);
+  msgs.scrollTop=msgs.scrollHeight;
+  await new Promise(r=>setTimeout(r,500+Math.random()*500));
+  lb.classList.remove('ai-loading');lb.textContent=aiReply(text.toLowerCase());msgs.scrollTop=msgs.scrollHeight;
+}
+function aiReply(q){
+  const ist=getIST(),h=ist.getHours();
+  const isNight=h>=21||h<5,isEve=h>=18&&h<21;
+  const hr=routeData.length>0,rs=hr?routeData[0].score:null,hs=hr?routeData[0].near.map(n=>n.name):[];
+  if(/help|danger|attack|follow|stalk|emergency|harass|scared/i.test(q))return'🚨 Call 112 immediately or 1091 (Women\'s Helpline). Move to a crowded, lit area — shop, petrol pump, police chowki.';
+  if(hr&&/route|path|this route|safe.*travel/i.test(q)){const lbl=rs>=70?'safe':rs>=45?'moderately risky':'high risk';return'Your route scores '+rs+'/100 — '+lbl+'. '+(hs.length?'Watch out near: '+hs.slice(0,3).join(', ')+'.':'No major hotspots detected.')+(isNight?' ⚠ Score is penalised for night hours.':'');}
+  if(/dharavi/i.test(q))return'⚠ Dharavi is high-risk, especially after 8 PM. Stick to Sion-Dharavi Road and avoid narrow internal lanes.';
+  if(/kurla|govandi|mankhurd/i.test(q))return'🔴 These are highest-risk zones. Travel only in daytime with a companion. Keep 112 ready.';
+  if(/colaba|worli/i.test(q))return'🟢 Colaba and Worli are relatively low-risk. Normal precautions apply after midnight.';
+  if(/night|dark|late|midnight/i.test(q))return'🌙 At night: (1) Share live location, (2) Use Safe Walk Timer, (3) Stick to lit main roads, (4) Use app-based cabs with trip sharing. Call 1091 if harassed.';
+  if(/follow|being followed/i.test(q))return'1. Don\'t go home — enter a crowded shop. 2. Call someone loudly. 3. Find a police chowki. 4. Call 100 if it persists.';
+  if(/train|local|metro|railway/i.test(q))return'🚉 Always use the Ladies\' compartment. At night, stand near the guard coach. Avoid empty platforms.';
+  if(/sos|helpline|number|emergency/i.test(q))return'📞 112 — All emergencies\n1091 — Women\'s Helpline (24/7)\n100 — Police\n108 — Ambulance';
+  if(/tip|advice|safe/i.test(q))return(isNight?'Night — extra caution. ':isEve?'Evening — stay alert. ':'Daytime — generally safe. ')+'Key tips: (1) Share live location, (2) Safe Walk Timer, (3) Lit main roads, (4) Ladies compartment in trains, (5) Keep 112 on speed dial.';
+  if(/ncrb|data|statistics|crime rate|mumbai police/i.test(q))return'📊 Mumbai Police Data:\n• 2025: 7,143 crimes against women\n• Jan 2026: 515 cases (80 rape, 111 kidnapping, 174 molestation)\n• Highest risk: Zone III (Central/Dharavi) and Zone VI-VII (Eastern Suburbs)';
+  return['I can help with safety tips, area risk info, or analysing your route.','Try asking: "Is Kurla safe at night?" or "What to do if someone follows me?"','I know Mumbai\'s crime zones, transport safety, and emergency numbers.'][Math.floor(Math.random()*3)];
+}
+
 /* ── HELPERS ── */
 function showPill(t){document.getElementById('pillTxt').textContent=t;document.getElementById('pill').classList.add('on');}
 function hidePill(){document.getElementById('pill').classList.remove('on');}
@@ -984,64 +1016,30 @@ document.getElementById('rc0').addEventListener('click',()=>pickRoute(0));
 document.getElementById('rc1').addEventListener('click',()=>pickRoute(1));
 document.getElementById('rc2').addEventListener('click',()=>pickRoute(2));
 document.getElementById('closeSos').addEventListener('click',closeSOS);
+// modalShare: backend.js attaches the SOS SMS handler on this button.
+// Do NOT bind shareMyLocation here — it would override the SMS sending.
 document.getElementById('sosModal').addEventListener('click',e=>{if(e.target===document.getElementById('sosModal'))closeSOS();});
-
-/* ── SHARE LIVE LOCATION / WHATSAPP SOS ── */
-document.getElementById('modalShare').addEventListener('click',async()=>{
-  const BACKEND='https://web-production-32acd.up.railway.app';
-  const contactList=contacts||[];
-
-  if(!contactList.some(c=>c.phone)){
-    toast('⚠ Add a phone number to your contacts first');
-    return;
-  }
-
-  // Get best available location
-  let lat=_uLat,lng=_uLng;
-  if(navigator.geolocation){
-    await new Promise(resolve=>{
-      navigator.geolocation.getCurrentPosition(pos=>{
-        lat=pos.coords.latitude;
-        lng=pos.coords.longitude;
-        resolve();
-      },resolve,{timeout:3000});
-    });
-  }
-  // Fallback to Mumbai centre so alert always sends
-  const finalLat=lat||19.076;
-  const finalLng=lng||72.877;
-
-  toast('📡 Sending WhatsApp alerts…');
-  try{
-    const res=await fetch(BACKEND+'/api/sos',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        lat:finalLat,lng:finalLng,
-        contacts:contactList.map(c=>({name:c.name,phone:c.phone})),
-        sessionId:localStorage.getItem('sr_session')||'unknown'
-      })
-    });
-    const data=await res.json();
-    if(data.success){
-      toast('📱 WhatsApp sent to '+data.sent+' contact'+(data.sent!==1?'s':'')+'!');
-    } else {
-      toast('⚠ Failed to send — call 112 directly');
-    }
-  } catch(e){
-    console.error('[SOS]',e);
-    toast('⚠ Could not reach server — call 112 directly');
-  }
-});
 document.getElementById('fcDecline').addEventListener('click',endFakeCall);
 document.getElementById('fcAccept').addEventListener('click',endFakeCall);
 document.getElementById('irBannerBtn').addEventListener('click',openIRModal);
 document.getElementById('mapReportBtn').addEventListener('click',openIRModal);
-document.getElementById('irSubmit').addEventListener('click',submitIncident);document.getElementById('irCancel').addEventListener('click',closeIRModal);
+document.getElementById('irSubmit').addEventListener('click',()=>{
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(pos=>{
+      _uLat=pos.coords.latitude;_uLng=pos.coords.longitude;
+      submitIncident();
+    },()=>submitIncident(),{timeout:4000});
+  } else {
+    submitIncident();
+  }
+});
+document.getElementById('irCancel').addEventListener('click',closeIRModal);
 document.getElementById('irModal').addEventListener('click',e=>{if(e.target===document.getElementById('irModal'))closeIRModal();});
 document.getElementById('heatmapBtn').addEventListener('click',toggleHeatmap);
 document.getElementById('startNavBtn').addEventListener('click',startNavigation);
 document.getElementById('stopNavBtn').addEventListener('click',()=>stopNavigation(false));
+document.getElementById('aiSend').addEventListener('click',sendAI);
+document.getElementById('aiInput').addEventListener('keydown',e=>{if(e.key==='Enter')sendAI();});
 
 /* ── INIT AFTER MAP LOADS ── */
 // style.load fires on initial load AND after style changes (night/day toggle)
