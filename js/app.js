@@ -116,7 +116,17 @@ function renderContacts(){
   list.querySelectorAll('[data-ei]').forEach(b=>b.addEventListener('click',()=>editContact(+b.dataset.ei)));
   sos.innerHTML=contacts.filter(c=>c.phone).map(c=>`<button class="mc-btn" data-p="${c.phone}">${c.name}</button>`).join('');
   sos.querySelectorAll('[data-p]').forEach(b=>b.addEventListener('click',()=>{window.location='tel:'+b.dataset.p;}));
-  document.getElementById('waLink').href='https://wa.me/?text='+encodeURIComponent('🚨 SafeRoute SOS — I need help! My location: https://maps.google.com/?q='+_uLat+','+_uLng);
+  // Build WhatsApp link with current location (refresh on every modal open)
+  const waEl=document.getElementById('waLink');
+  const waText='🚨 SafeRoute SOS — I need help! My location: https://maps.google.com/?q='+_uLat+','+_uLng;
+  waEl.href='https://wa.me/?text='+encodeURIComponent(waText);
+  // If geolocation is available, update with fresh coords
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(pos=>{
+      const freshText='🚨 SafeRoute SOS — I need help! My location: https://maps.google.com/?q='+pos.coords.latitude+','+pos.coords.longitude;
+      waEl.href='https://wa.me/?text='+encodeURIComponent(freshText);
+    },()=>{});// silently fall back to stale coords if GPS fails
+  }
   document.getElementById('fcName').textContent=contacts[0]?contacts[0].name:'Mom';
 }
 function addContact(){const name=prompt('Contact name:');if(!name)return;const phone=prompt('Phone (e.g. +919876543210):')||'';const rel=prompt('Relationship:','Friend')||'Friend';const cols=['#c8401a','#2c4a6e','#2a6b4a','#b8860b','#7c3aed'];contacts.push({name,phone,rel,color:cols[contacts.length%cols.length]});lsSet('sr_contacts',contacts);renderContacts();toast(name+' added');}
@@ -196,6 +206,16 @@ const map=new mapboxgl.Map({
 });
 map.addControl(new mapboxgl.NavigationControl(),'top-right');
 map.addControl(new mapboxgl.AttributionControl({compact:true}),'bottom-right');
+
+/* ── SILENT GPS PREFETCH ── */
+// Grab the user's location silently on load so _uLat/_uLng are ready
+// before they ever press SOS. No UI changes — just updates the variables.
+if(navigator.geolocation){
+  navigator.geolocation.getCurrentPosition(pos=>{
+    _uLat=pos.coords.latitude;
+    _uLng=pos.coords.longitude;
+  },()=>{}); // ignore errors silently
+}
 
 /* ── POPUP HELPER ── */
 function makePopup(html){return new mapboxgl.Popup({closeButton:true,maxWidth:'240px'}).setHTML(html);}
@@ -964,6 +984,7 @@ function showPill(t){document.getElementById('pillTxt').textContent=t;document.g
 function hidePill(){document.getElementById('pill').classList.remove('on');}
 
 /* ── WIRE ALL EVENTS ── */
+// navSos: backend.js will add the SMS-sending listener on top of this
 document.getElementById('navSos').addEventListener('click',openSOS);
 document.getElementById('goBtn').addEventListener('click',planRoutes);
 document.getElementById('modeDrive').addEventListener('click',()=>setMode('driving'));
@@ -991,8 +1012,55 @@ document.getElementById('rc0').addEventListener('click',()=>pickRoute(0));
 document.getElementById('rc1').addEventListener('click',()=>pickRoute(1));
 document.getElementById('rc2').addEventListener('click',()=>pickRoute(2));
 document.getElementById('closeSos').addEventListener('click',closeSOS);
-document.getElementById('modalShare').addEventListener('click',shareMyLocation);
 document.getElementById('sosModal').addEventListener('click',e=>{if(e.target===document.getElementById('sosModal'))closeSOS();});
+
+/* ── SHARE LIVE LOCATION / WHATSAPP SOS ── */
+document.getElementById('modalShare').addEventListener('click',async()=>{
+  const BACKEND='https://web-production-32acd.up.railway.app';
+  const contactList=contacts||[];
+
+  if(!contactList.some(c=>c.phone)){
+    toast('⚠ Add a phone number to your contacts first');
+    return;
+  }
+
+  // Get best available location
+  let lat=_uLat,lng=_uLng;
+  if(navigator.geolocation){
+    await new Promise(resolve=>{
+      navigator.geolocation.getCurrentPosition(pos=>{
+        lat=pos.coords.latitude;
+        lng=pos.coords.longitude;
+        resolve();
+      },resolve,{timeout:3000});
+    });
+  }
+  // Fallback to Mumbai centre so alert always sends
+  const finalLat=lat||19.076;
+  const finalLng=lng||72.877;
+
+  toast('📡 Sending WhatsApp alerts…');
+  try{
+    const res=await fetch(BACKEND+'/api/sos',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        lat:finalLat,lng:finalLng,
+        contacts:contactList.map(c=>({name:c.name,phone:c.phone})),
+        sessionId:localStorage.getItem('sr_session')||'unknown'
+      })
+    });
+    const data=await res.json();
+    if(data.success){
+      toast('📱 WhatsApp sent to '+data.sent+' contact'+(data.sent!==1?'s':'')+'!');
+    } else {
+      toast('⚠ Failed to send — call 112 directly');
+    }
+  } catch(e){
+    console.error('[SOS]',e);
+    toast('⚠ Could not reach server — call 112 directly');
+  }
+});
 document.getElementById('fcDecline').addEventListener('click',endFakeCall);
 document.getElementById('fcAccept').addEventListener('click',endFakeCall);
 document.getElementById('irBannerBtn').addEventListener('click',openIRModal);
