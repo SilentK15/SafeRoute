@@ -259,6 +259,10 @@ function addHotspotLayers(){
 /* ── INCIDENT MARKERS ── */
 const _incidentMarkers=[];
 function addIncidentMarker(inc){
+  if(!map.isStyleLoaded()){
+    map.once('style.load',()=>addIncidentMarker(inc));
+    return;
+  }
   const el=document.createElement('div');
   el.style.cssText='width:12px;height:12px;border-radius:50%;background:#e05252;border:2px solid white;box-shadow:0 0 6px #e0525266;cursor:pointer;';
   const m=new mapboxgl.Marker({element:el}).setLngLat([inc.lng,inc.lat])
@@ -266,7 +270,8 @@ function addIncidentMarker(inc){
     .addTo(map);
   _incidentMarkers.push(m);
 }
-_irMarkers.forEach(addIncidentMarker);
+// NOTE: saved incidents are loaded inside map.on('style.load') below
+// so markers are only added once the map is ready
 
 /* ── GPS / MY LOCATION ── */
 let _uMarker=null;
@@ -1055,6 +1060,10 @@ map.on('style.load',()=>{
     _routeLayersAdded=false;
     routeData.forEach((r,i)=>drawRoute(r,i,i===0?0.9:0.3,i===0?5:3));
   }
+  // Re-add all saved incident markers (localStorage) — must happen after style loads
+  _incidentMarkers.forEach(m=>m.remove());
+  _incidentMarkers.length=0;
+  _irMarkers.forEach(addIncidentMarker);
 });
 
 renderContacts();
