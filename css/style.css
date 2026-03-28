@@ -267,13 +267,7 @@ html.night .mapboxgl-popup-tip{border-top-color:var(--paper)!important;border-bo
 
 
 /* AI */
-.ai-wrap{background:var(--paper);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
-.ai-msgs{max-height:200px;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;}
-.ai-bubble{font-size:.8125rem;line-height:1.55;padding:9px 12px;border-radius:12px;max-width:92%;}
-.ai-bot{background:var(--bg);color:var(--ink);border:1px solid var(--border);align-self:flex-start;border-bottom-left-radius:4px;}
-.ai-user{background:var(--blue);color:#fff;align-self:flex-end;border-bottom-right-radius:4px;}
-.ai-loading{opacity:.5;font-style:italic;}
-.ai-input-row{display:flex;border-top:1px solid var(--border);}
+
 #aiInput{flex:1;border:none;outline:none;padding:10px 12px;font-family:var(--font);font-size:.8125rem;color:var(--ink);background:var(--paper);}
 #aiInput::placeholder{color:var(--muted);}
 #aiSend{background:none;color:var(--blue);border:none;padding:0 14px;font-size:1.1rem;cursor:pointer;transition:background .13s;}
