@@ -18,7 +18,7 @@
   // ⚠️  IMPORTANT: Change this to your deployed backend URL before going live.
   // e.g. 'https://saferoute-backend-production.up.railway.app'
   // For local development keep it as 'http://localhost:3001'
-  const BACKEND_URL = 'web-production-32acd.up.railway.app';
+  const BACKEND_URL = 'https://web-production-32acd.up.railway.app';
 
   // A random ID stored in localStorage to identify this browser session
   // (not linked to any personal info — just prevents duplicate spam)
